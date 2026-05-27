@@ -1,0 +1,115 @@
+# CFCamo RL — LoRA (paper main, CFCamo-4B LoRA).
+#
+# CSPO/CPR RL on top of the SFT cold-start. Reproduces the paper-main LoRA
+# checkpoint at epsilon=0.5 (step 252 = half an epoch over the 4040-pair set,
+# 8080 orig+cf rows / batch 16 = ~505 steps per epoch). The LoRA schema-validity
+# collapses as it approaches a full epoch (paper Fig. 6), so the half-epoch
+# checkpoint is the reported result.
+#
+# Reward = CPR (cfcamo.easyr1_reward.compute_score), eta=1.0 by default.
+# For the Section 5.4 "w/o SAM mask" ablation, set CFCAMO_REWARD_VARIANT=bbox_iou.
+#
+# Hardware: single 80/96 GB GPU is sufficient for the LoRA setting.
+
+data:
+  train_files: data/cfcod/rl/train.jsonl   # released CF-COD RL split (paired orig+cf rows)
+  val_files: data/cfcod/rl/val.jsonl
+  prompt_key: problem
+  answer_key: answer
+  image_key: images
+  image_dir: data/cfcod   # joined with row['images'] entries (relative paths)
+  max_prompt_length: 1024
+  max_response_length: 768
+  rollout_batch_size: 16
+  mini_rollout_batch_size: null
+  val_batch_size: 32
+  format_prompt: configs/prompt.jinja
+  override_chat_template: null
+  shuffle: false          # rows are pre-laid-out so paired orig/cf land in the same batch
+  seed: 42
+  min_pixels: 262144
+  max_pixels: 589824
+  filter_overlong_prompts: true
+
+algorithm:
+  adv_estimator: grpo
+  disable_kl: false
+  use_kl_loss: true
+  kl_penalty: low_var_kl
+  kl_coef: 1.0e-2
+  online_filtering: false
+
+worker:
+  actor:
+    loss_type: gspo
+    global_batch_size: 16
+    micro_batch_size_per_device_for_update: 4
+    micro_batch_size_per_device_for_experience: 8
+    max_grad_norm: 1.0
+    padding_free: true
+    dynamic_batching: true
+    ulysses_size: 1
+    model:
+      model_path: checkpoints/cfcamo-sft-4b   # SFT cold-start (see README; on HF Hub)
+      enable_gradient_checkpointing: false
+      trust_remote_code: false
+      freeze_vision_tower: false
+      lora:
+        rank: 64
+        alpha: 128
+        target_modules: all-linear
+        exclude_modules: '.*visual.*'
+    optim:
+      lr: 5.0e-6
+      weight_decay: 1.0e-2
+      strategy: adamw
+      lr_warmup_ratio: 0.0
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+
+  rollout:
+    n: 8
+    temperature: 1.0
+    top_p: 0.9
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.70
+    enforce_eager: false
+    val_override_config:
+      n: 1
+      temperature: 0.0
+      top_p: 1.0
+
+  ref:
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+
+  reward:
+    reward_function: configs/easyr1_reward_wrapper.py:compute_score
+
+trainer:
+  total_epochs: 2          # upper bound; max_steps caps the run
+  max_steps: 252           # epsilon=0.5 (paper-main LoRA checkpoint)
+  project_name: cfcamo
+  experiment_name: cfcamo_rl_lora
+  logger: ["console", "file"]
+  nnodes: 1
+  n_gpus_per_node: 1
+  max_try_make_batch: 20
+  val_freq: -1
+  val_before_train: false
+  val_only: false
+  val_generations_to_log: 3
+  save_freq: 252
+  save_limit: 1
+  save_model_only: true
+  save_checkpoint_path: checkpoints/rl_lora
+  load_checkpoint_path: null
+  find_last_checkpoint: false

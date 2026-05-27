@@ -1,0 +1,113 @@
+# CFCamo RL — Full fine-tuning (paper, CFCamo-4B Full FT).
+#
+# Same CSPO/CPR setup as rl_lora.yaml but full-parameter (lora.rank=0), with a
+# more conservative lr and a stronger KL anchor. Reproduces the paper-main Full
+# FT checkpoint at epsilon=0.5 (step 126 = 4032 sample views over the 4040-pair
+# set at batch 32; this is the apple-to-apple match with LoRA step 252).
+#
+# Reward = CPR (eta=1.0). For the Section 5.4 "w/o SAM mask" ablation set
+# CFCAMO_REWARD_VARIANT=bbox_iou.
+#
+# Hardware: full fine-tuning of the 4B model needs multiple large GPUs
+# (we used 4x A800-80G). Lower gpu_memory_utilization leaves room for actor
+# activations; LoRA (rl_lora.yaml) is the single-GPU alternative.
+
+data:
+  train_files: data/cfcod/rl/train.jsonl
+  val_files: data/cfcod/rl/val.jsonl
+  prompt_key: problem
+  answer_key: answer
+  image_key: images
+  image_dir: data/cfcod   # joined with row['images'] entries (relative paths)
+  max_prompt_length: 1024
+  max_response_length: 768
+  rollout_batch_size: 32
+  mini_rollout_batch_size: null
+  val_batch_size: 32
+  format_prompt: configs/prompt.jinja
+  override_chat_template: null
+  shuffle: false
+  seed: 42
+  min_pixels: 262144
+  max_pixels: 589824
+  filter_overlong_prompts: true
+
+algorithm:
+  adv_estimator: grpo
+  disable_kl: false
+  use_kl_loss: true
+  kl_penalty: low_var_kl
+  kl_coef: 5.0e-2          # 5x the LoRA anchor: full FT has more freedom to drift
+  online_filtering: false
+
+worker:
+  actor:
+    loss_type: gspo
+    global_batch_size: 32
+    micro_batch_size_per_device_for_update: 1
+    micro_batch_size_per_device_for_experience: 2
+    max_grad_norm: 1.0
+    padding_free: true
+    dynamic_batching: true
+    ulysses_size: 1
+    model:
+      model_path: checkpoints/cfcamo-sft-4b   # SFT cold-start (see README; on HF Hub)
+      enable_gradient_checkpointing: false
+      trust_remote_code: false
+      freeze_vision_tower: false
+      lora:
+        rank: 0            # full fine-tuning
+    optim:
+      lr: 1.0e-6           # conservative for full FT
+      weight_decay: 1.0e-2
+      strategy: adamw
+      lr_warmup_ratio: 0.0
+    fsdp:
+      enable_full_shard: false  # ZeRO-2 (fits on 4x80G)
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+
+  rollout:
+    n: 8
+    temperature: 1.0
+    top_p: 0.9
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.4
+    enforce_eager: true
+    val_override_config:
+      n: 1
+      temperature: 0.0
+      top_p: 1.0
+
+  ref:
+    fsdp:
+      enable_full_shard: false
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+
+  reward:
+    reward_function: configs/easyr1_reward_wrapper.py:compute_score
+
+trainer:
+  total_epochs: 2          # upper bound; max_steps caps the run
+  max_steps: 126           # epsilon=0.5 (paper-main Full FT checkpoint)
+  project_name: cfcamo
+  experiment_name: cfcamo_rl_full
+  logger: ["console", "file"]
+  nnodes: 1
+  n_gpus_per_node: 4
+  max_try_make_batch: 20
+  val_freq: -1
+  val_before_train: false
+  val_only: false
+  val_generations_to_log: 3
+  save_freq: 126
+  save_limit: 1
+  save_model_only: true
+  save_checkpoint_path: checkpoints/rl_full
+  load_checkpoint_path: null
+  find_last_checkpoint: false

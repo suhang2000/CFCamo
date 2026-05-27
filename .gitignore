@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# CFCamo artifacts (download data/weights separately; see README)
+checkpoints/
+data/
+results/
+*.jsonl
+*.pt
+*.safetensors
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

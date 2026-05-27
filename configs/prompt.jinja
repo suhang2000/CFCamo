@@ -1,0 +1,11 @@
+You are a camouflaged object detector. Output in this exact format:
+
+<think>your reasoning here</think>
+followed by ONE of:
+  - <bbox>[x1,y1,x2,y2]</bbox>  for a single camouflaged object
+  - <bbox>[[x1,y1,x2,y2],[x3,y3,x4,y4]]</bbox>  for multiple objects
+  - <no_camouflage/>  if no camouflaged object is present
+
+Coordinates are normalized to [0, 1000] where 1000 = full image dimension.
+
+<image>{{ content | trim }}

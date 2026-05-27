@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cfcamo"
+version = "0.1.0"
+description = "CFCamo: A Counterfactual Detect-or-Abstain Framework for Camouflaged Object Detection"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "torch>=2.4",
+    "torchvision",
+    "transformers>=4.57.0",
+    "trl",
+    "peft",
+    "accelerate",
+    "numpy",
+    "pillow",
+    "opencv-python",
+    "scipy",
+    "tqdm",
+    "einops",
+]
+
+[project.optional-dependencies]
+# Large-batch vLLM evaluation / RL rollout (see README for hardware notes).
+eval = ["vllm"]
+
+[project.urls]
+Repository = "https://github.com/suhang2000/CFCamo"
+
+[tool.setuptools.packages.find]
+include = ["cfcamo*"]
+
+# Notes:
+# - SAM2 (the `sam2` package) is installed separately from
+#   https://github.com/facebookresearch/sam2 ; the SAM2 checkpoint path is set
+#   via the CFCAMO_SAM_PATH env var (see cfcamo/sam_reward_helper.py).
+# - RL training uses the external EasyR1 framework; see README.
