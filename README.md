@@ -15,6 +15,7 @@ Code, benchmark, and weights for **CFCamo**.
 > and a **Counterfactual Paired Reward (CPR)** that couples original-image
 > detection with counterfactual abstention.
 
+- 📄 Paper: [arXiv:2606.11231](https://arxiv.org/abs/2606.11231)
 - 🤗 Benchmark (CF-COD) + training splits: [cfcamo/CF-COD](https://huggingface.co/datasets/cfcamo/CF-COD)
 - 🤗 Weights:
   [cfcamo-sft-4b](https://huggingface.co/cfcamo/cfcamo-sft-4b) (cold-start) ·
@@ -157,7 +158,7 @@ scripts/eval/      # eval_cfcod.py, infer.py, merge_lora.py
 @article{li2026cfcamo,
   title   = {{CFCamo}: A Counterfactual Detect-or-Abstain Framework for Camouflaged Object Detection},
   author  = {Li, Suhang and Yoshie, Osamu and Ieiri, Yuya},
-  journal = {Under review},
+  journal = {arXiv preprint arXiv:2606.11231},
   year    = {2026}
 }
 ```
